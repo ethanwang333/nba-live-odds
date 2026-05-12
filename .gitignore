@@ -1,0 +1,40 @@
+# Python compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment — never commit this (it's huge)
+venv/
+env/
+.venv/
+
+# Secret keys — NEVER commit this
+.env
+
+# Trained ML model files (too large for git)
+*.pkl
+*.pt
+*.joblib
+ml/models/
+
+# Data files (too large — can be gigabytes)
+data/raw/
+data/processed/
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Node / React
+node_modules/
+dist/
+.next/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code settings (optional — some people commit these)
+.vscode/
