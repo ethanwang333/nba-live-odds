@@ -1,0 +1,21 @@
+# Data & ML
+pandas
+numpy
+scikit-learn
+xgboost
+nba_api
+
+# Backend & API
+fastapi
+uvicorn[standard]
+websockets
+python-dotenv
+httpx
+
+# Database
+sqlalchemy
+psycopg2-binary
+redis
+
+# Development
+jupyter
