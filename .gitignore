@@ -17,7 +17,9 @@ env/
 *.pkl
 *.pt
 *.joblib
-ml/models/
+ml/models/*.pkl
+ml/models/*.pt
+ml/models/*.joblib
 
 # Data files (too large — can be gigabytes)
 data/raw/
