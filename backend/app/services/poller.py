@@ -1,4 +1,5 @@
-from nba_api.live.nba.endpoints import scoreboard
+# backend/app/services/poller.py
+from nba_api.live.nba.endpoints import scoreboard, boxscore
 from app.services.redis_client import redis_client
 from app.services.predictor import predict_win_probability
 import json
@@ -27,6 +28,51 @@ def clock_to_seconds(clock_str, period):
         return max(float(total), 0.0)
     return 0.0
 
+def format_clock(clock_str):
+    # converts PT09M15.00S to 9:15
+    if not clock_str:
+        return "--"
+    match = re.match(r'PT(\d+)M([\d.]+)S', str(clock_str))
+    if match:
+        minutes = int(match.group(1))
+        seconds = int(float(match.group(2)))
+        return f"{minutes}:{seconds:02d}"
+    return "--"
+
+def get_top_players(game_id):
+    # fetch live boxscore and return top 5 players per team by points
+    try:
+        box = boxscore.BoxScore(game_id=game_id, headers=HEADERS)
+        box_data = box.get_dict()
+        game = box_data['game']
+
+        result = {"homeTeam": [], "awayTeam": []}
+
+        for side in ["homeTeam", "awayTeam"]:
+            players = game[side]["players"]
+            active = [
+                p for p in players
+                if p.get("played") == "1"
+            ]
+            # sort by points descending
+            active.sort(key=lambda p: p["statistics"]["points"], reverse=True)
+            top5 = active[:5]
+            result[side] = [
+                {
+                    "name": p["nameI"],
+                    "points": p["statistics"]["points"],
+                    "rebounds": p["statistics"]["reboundsTotal"],
+                    "assists": p["statistics"]["assists"],
+                    "fouls": p["statistics"]["foulsPersonal"],
+                    "minutes": p["statistics"]["minutesCalculated"].replace("PT", "").replace("M", ""),
+                }
+                for p in top5
+            ]
+        return result
+    except Exception as e:
+        print(f"  Boxscore error for {game_id}: {e}")
+        return {"homeTeam": [], "awayTeam": []}
+
 def poll_once():
     board = scoreboard.ScoreBoard(headers=HEADERS)
     games = board.games.get_dict()
@@ -54,6 +100,9 @@ def poll_once():
 
         probability = predict_win_probability(game_state)
 
+        # fetch player stats -- every 30 seconds to avoid rate limits
+        players = get_top_players(game_id)
+
         data = {
             'gameId': game_id,
             'homeTeam': game['homeTeam']['teamTricode'],
@@ -62,10 +111,12 @@ def poll_once():
             'scoreAway': score_away,
             'period': period,
             'gameClock': clock,
+            'gameClockFormatted': format_clock(clock),
             'total_seconds_remaining': total_seconds,
             'home_win_probability': probability,
             'away_win_probability': round(1 - probability, 4),
-            'gameStatus': 2
+            'gameStatus': 2,
+            'players': players,
         }
 
         redis_client.set(f"game:{game_id}", json.dumps(data))
@@ -73,7 +124,7 @@ def poll_once():
 
         print(f"  {data['awayTeam']} @ {data['homeTeam']} | "
               f"{data['scoreAway']}-{data['scoreHome']} | "
-              f"Q{period} | "
+              f"Q{period} {data['gameClockFormatted']} | "
               f"Home win prob: {probability}")
 
     redis_client.set("active_games", json.dumps(active_ids))

@@ -1,5 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 from app.services.redis_client import redis_client
+from app.services.gemini import ask_gemini
 import json
 import asyncio
 
@@ -24,6 +26,20 @@ def get_game(game_id: str):
     if not data:
         return {"error": "Game not found"}
     return json.loads(data)
+
+class ChatRequest(BaseModel):
+    question: str
+    game_id: str
+
+@router.post("/chat")
+async def chat(request: ChatRequest):
+    game_data = redis_client.get(f"game:{request.game_id}")
+    if not game_data:
+        game_context = {}
+    else:
+        game_context = json.loads(game_data)
+    answer = await ask_gemini(request.question, game_context)
+    return {"answer": answer}
 
 @router.websocket("/ws/games")
 async def websocket_games(websocket: WebSocket):
