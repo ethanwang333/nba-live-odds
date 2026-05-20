@@ -55,3 +55,5 @@ A real-time NBA win probability dashboard that tracks live games, predicts outco
 ## Screenshots
 
 ![NBA Live Odds Dashboard](docs/dashboard1.png)
+![NBA Live Odds Dashboard 2](docs/dashboard2.png)
+![NBA Live Odds Dashboard 3](docs/dashboard3.png)

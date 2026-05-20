@@ -12,20 +12,35 @@ async def ask_gemini(question: str, game_context: dict) -> str:
         players_home = game_context.get('players', {}).get('homeTeam', [])
         players_away = game_context.get('players', {}).get('awayTeam', [])
 
-        home_stats = ", ".join([f"{p['name']} {p['points']}pts" for p in players_home[:3]])
-        away_stats = ", ".join([f"{p['name']} {p['points']}pts" for p in players_away[:3]])
+        def format_players(players):
+            lines = []
+            for p in players[:5]:
+                foul_note = " (foul trouble)" if p.get('fouls', 0) >= 4 else ""
+                lines.append(
+                    f"{p['name']}: {p['points']}pts {p['rebounds']}reb {p['assists']}ast {p['fouls']}fl{foul_note}"
+                )
+            return ", ".join(lines)
+
+        home_stats = format_players(players_home)
+        away_stats = format_players(players_away)
 
         home_prob = round(game_context.get('home_win_probability', 0) * 100, 1)
         away_prob = round(100 - home_prob, 1)
 
+        score_home = game_context.get('scoreHome', 0)
+        score_away = game_context.get('scoreAway', 0)
+        margin = score_home - score_away
+        margin_text = f"{game_context.get('homeTeam')} leads by {abs(margin)}" if margin > 0 else f"{game_context.get('awayTeam')} leads by {abs(margin)}" if margin < 0 else "tied"
+
         prompt = (
-            f"NBA game: {game_context.get('awayTeam')} {game_context.get('scoreAway')} "
-            f"@ {game_context.get('homeTeam')} {game_context.get('scoreHome')}, "
-            f"Q{game_context.get('period')} {game_context.get('gameClockFormatted')} left. "
-            f"Win prob: {game_context.get('homeTeam')} {home_prob}% / {game_context.get('awayTeam')} {away_prob}%. "
-            f"Top scorers: {game_context.get('homeTeam')}: {home_stats} | {game_context.get('awayTeam')}: {away_stats}. "
-            f"Question: {question} "
-            f"Answer in 2 sentences max."
+            f"You are an expert NBA analyst. Answer concisely in 2-3 sentences using the stats below. "
+            f"Consider overall impact — points, rebounds, assists, foul trouble — not just scoring.\n\n"
+            f"Game: {game_context.get('awayTeam')} {score_away} @ {game_context.get('homeTeam')} {score_home} "
+            f"({margin_text}), Q{game_context.get('period')} {game_context.get('gameClockFormatted')} left.\n"
+            f"Win probability: {game_context.get('homeTeam')} {home_prob}% / {game_context.get('awayTeam')} {away_prob}%.\n"
+            f"{game_context.get('homeTeam')} players: {home_stats}\n"
+            f"{game_context.get('awayTeam')} players: {away_stats}\n\n"
+            f"Question: {question}"
         )
 
         async with httpx.AsyncClient() as client:

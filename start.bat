@@ -13,6 +13,9 @@ start "FastAPI" cmd /k "cd backend && venv\Scripts\activate && python -m uvicorn
 echo Starting React in new window...
 start "React" cmd /k "cd frontend && npm run dev"
 
+echo Killing any existing ngrok...
+taskkill /f /im ngrok.exe 2>nul
+
 echo Starting ngrok...
 start "ngrok" cmd /k "ngrok http --domain=expand-landlord-onscreen.ngrok-free.dev 8000"
 
