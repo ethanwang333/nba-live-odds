@@ -91,7 +91,7 @@ function App() {
             <GameCard
               key={game.gameId}
               game={game}
-              history={game.history || []}
+              history={history[game.gameId] || []}
             />
           ))
         )}
