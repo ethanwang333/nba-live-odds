@@ -1,40 +1,40 @@
 import { useState, useEffect } from "react"
 import GameCard from "./components/GameCard"
-import ChatPanel from "./components/ChatPanel"
 
 function App() {
   const [games, setGames] = useState([])
   const [connected, setConnected] = useState(false)
-  const [history, setHistory] = useState({})
 
   useEffect(() => {
-    const wsUrl = import.meta.env.VITE_API_URL.replace("http", "ws")
-    const ws = new WebSocket(`${wsUrl}/ws/games`)
-    ws.onopen = () => setConnected(true)
-    ws.onclose = () => setConnected(false)
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      setGames(data.games)
-      setHistory(prev => {
-        const updated = { ...prev }
-        data.games.forEach(game => {
-          const existing = updated[game.gameId] || []
-          const lastPoint = existing[existing.length - 1]
-          const newProb = game.home_win_probability
-          const lastProb = lastPoint ? lastPoint.home : null
-          if (lastProb === null || newProb !== lastProb) {
-            const point = {
-              time: game.total_seconds_remaining,
-              home: game.home_win_probability,
-              away: 1 - game.home_win_probability
-            }
-            updated[game.gameId] = [...existing, point]
-          }
-        })
-        return updated
-      })
+    let ws
+    let reconnectTimer
+
+    const connect = () => {
+      const wsUrl = (import.meta.env.VITE_API_URL || "http://localhost:8000").replace("http", "ws")
+      ws = new WebSocket(`${wsUrl}/ws/games`)
+
+      ws.onopen = () => {
+        setConnected(true)
+        clearTimeout(reconnectTimer)
+      }
+
+      ws.onclose = () => {
+        setConnected(false)
+        reconnectTimer = setTimeout(connect, 3000)
+      }
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+        setGames(data.games)
+      }
     }
-    return () => ws.close()
+
+    connect()
+
+    return () => {
+      clearTimeout(reconnectTimer)
+      if (ws) ws.close()
+    }
   }, [])
 
   return (
@@ -43,11 +43,11 @@ function App() {
       minHeight: "100vh",
       color: "white",
       fontFamily: "'Inter', 'Segoe UI', sans-serif",
+      overflowX: "hidden",
     }}>
-      {/* header */}
       <div style={{
         borderBottom: "1px solid #1e1e2e",
-        padding: "18px 32px",
+        padding: "16px 20px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -71,8 +71,13 @@ function App() {
         </div>
       </div>
 
-      {/* content */}
-      <div style={{ padding: "24px 32px", maxWidth: "1100px", margin: "0 auto" }}>
+      <div style={{
+        padding: "16px",
+        maxWidth: "1100px",
+        margin: "0 auto",
+        boxSizing: "border-box",
+        width: "100%",
+      }}>
         {games.length === 0 ? (
           <div style={{
             textAlign: "center", padding: "80px 0",
@@ -86,7 +91,7 @@ function App() {
             <GameCard
               key={game.gameId}
               game={game}
-              history={history[game.gameId] || []}
+              history={game.history || []}
             />
           ))
         )}

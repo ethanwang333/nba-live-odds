@@ -1,4 +1,3 @@
-# backend/app/services/poller.py
 from nba_api.live.nba.endpoints import scoreboard, boxscore
 from app.services.redis_client import redis_client
 from app.services.predictor import predict_win_probability
@@ -22,14 +21,15 @@ def clock_to_seconds(clock_str, period):
     match = re.match(r'PT(\d+)M([\d.]+)S', str(clock_str))
     if match:
         minutes = int(match.group(1))
-        seconds = float(match.group(2))
+        seconds = int(float(match.group(2)))
         seconds_in_period = (minutes * 60) + seconds
-        total = (4 - period) * 720 + seconds_in_period
-        return max(float(total), 0.0)
+        # cap period at 4 for regular time
+        capped_period = min(period, 4)
+        total = max(0, (4 - capped_period) * 720 + seconds_in_period)
+        return float(total)
     return 0.0
 
 def format_clock(clock_str):
-    # converts PT09M15.00S to 9:15
     if not clock_str:
         return "--"
     match = re.match(r'PT(\d+)M([\d.]+)S', str(clock_str))
@@ -40,7 +40,6 @@ def format_clock(clock_str):
     return "--"
 
 def get_top_players(game_id):
-    # fetch live boxscore and return top 5 players per team by points
     try:
         box = boxscore.BoxScore(game_id=game_id, headers=HEADERS)
         box_data = box.get_dict()
@@ -50,11 +49,7 @@ def get_top_players(game_id):
 
         for side in ["homeTeam", "awayTeam"]:
             players = game[side]["players"]
-            active = [
-                p for p in players
-                if p.get("played") == "1"
-            ]
-            # sort by points descending
+            active = [p for p in players if p.get("played") == "1"]
             active.sort(key=lambda p: p["statistics"]["points"], reverse=True)
             top5 = active[:5]
             result[side] = [
@@ -100,8 +95,23 @@ def poll_once():
 
         probability = predict_win_probability(game_state)
 
-        # fetch player stats -- every 30 seconds to avoid rate limits
         players = get_top_players(game_id)
+
+        # --- persist history in Redis ---
+        history_key = f"game:{game_id}:history"
+        history_raw = redis_client.get(history_key)
+        history = json.loads(history_raw) if history_raw else []
+
+        new_point = {
+            "time": total_seconds,
+            "home": probability,
+            "away": round(1 - probability, 4)
+        }
+
+        # only append if probability actually changed to avoid duplicate points
+        if not history or history[-1]["home"] != probability:
+            history.append(new_point)
+            redis_client.set(history_key, json.dumps(history))
 
         data = {
             'gameId': game_id,

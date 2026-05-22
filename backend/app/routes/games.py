@@ -7,6 +7,15 @@ import asyncio
 
 router = APIRouter()
 
+def get_game_with_history(game_id):
+    data = redis_client.get(f"game:{game_id}")
+    if not data:
+        return None
+    game = json.loads(data)
+    history_raw = redis_client.get(f"game:{game_id}:history")
+    game['history'] = json.loads(history_raw) if history_raw else []
+    return game
+
 @router.get("/games/live")
 def get_live_games():
     active_ids = redis_client.get("active_games")
@@ -15,17 +24,17 @@ def get_live_games():
     game_ids = json.loads(active_ids)
     games = []
     for game_id in game_ids:
-        data = redis_client.get(f"game:{game_id}")
-        if data:
-            games.append(json.loads(data))
+        game = get_game_with_history(game_id)
+        if game:
+            games.append(game)
     return {"games": games}
 
 @router.get("/games/{game_id}")
 def get_game(game_id: str):
-    data = redis_client.get(f"game:{game_id}")
-    if not data:
+    game = get_game_with_history(game_id)
+    if not game:
         return {"error": "Game not found"}
-    return json.loads(data)
+    return game
 
 class ChatRequest(BaseModel):
     question: str
@@ -51,9 +60,9 @@ async def websocket_games(websocket: WebSocket):
                 game_ids = json.loads(active_ids)
                 games = []
                 for game_id in game_ids:
-                    data = redis_client.get(f"game:{game_id}")
-                    if data:
-                        games.append(json.loads(data))
+                    game = get_game_with_history(game_id)
+                    if game:
+                        games.append(game)
                 await websocket.send_json({"games": games})
             await asyncio.sleep(1)
     except WebSocketDisconnect:
