@@ -42,7 +42,7 @@ function WinProbabilityChart({ history, homeTeam, awayTeam }) {
       <div style={{ fontSize: "12px", color: "#4a5568", marginBottom: "8px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
         Win Probability History
       </div>
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={200} minHeight={200}>
         <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#1a1a2e" vertical={false} />
 
